@@ -1,0 +1,56 @@
+-- PENTING: Gunakan sintaks CREATE OR REPLACE TABLE untuk menyimpan hasil query
+CREATE OR REPLACE TABLE
+  `rakamin-kf-analytics-4724.kimia_farma.kf_analysis` AS
+SELECT
+  -- 1. Kolom dari Transaksi (A)
+  t.transaction_id,
+  t.date,
+  t.customer_name,
+  t.product_id,
+  t.branch_id,
+  t.price AS actual_price_raw, -- Harga sebelum diskon
+  t.discount_percentage,
+  t.rating AS rating_transaksi,
+  
+  -- 2. Kolom dari Cabang (B)
+  kb.branch_name,
+  kb.kota,
+  kb.provinsi,
+  kb.rating AS rating_cabang, -- Rating konsumen terhadap cabang
+  
+  -- 3. Kolom dari Produk (P)
+  kp.product_name,
+
+  -- 4. Kalkulasi persentase_gross_laba
+  CASE
+    WHEN t.price <= 50000 THEN 0.10  -- 10%
+    WHEN t.price > 50000 AND t.price <= 100000 THEN 0.15 -- 15%
+    WHEN t.price > 100000 AND t.price <= 300000 THEN 0.20 -- 20%
+    WHEN t.price > 300000 AND t.price <= 500000 THEN 0.25 -- 25%
+    WHEN t.price > 500000 THEN 0.30  -- 30%
+    ELSE 0
+  END AS persentase_gross_laba,
+
+  -- 5. Kalkulasi nett_sales
+  t.price * (1 - t.discount_percentage) AS nett_sales,
+
+  -- 6. Kalkulasi nett_profit (Keuntungan)
+  (t.price * (1 - t.discount_percentage)) * (
+    CASE
+      WHEN t.price <= 50000 THEN 0.10
+      WHEN t.price > 50000 AND t.price <= 100000 THEN 0.15
+      WHEN t.price > 100000 AND t.price <= 300000 THEN 0.20
+      WHEN t.price > 300000 AND t.price <= 500000 THEN 0.25
+      WHEN t.price > 500000 THEN 0.30
+      ELSE 0
+    END
+  ) AS nett_profit
+
+FROM
+  `rakamin-kf-analytics-4724.kimia_farma.kf_final_transaction` AS t
+LEFT JOIN
+  `rakamin-kf-analytics-4724.kimia_farma.kf_kantor_cabang` AS kb
+  ON t.branch_id = kb.branch_id
+LEFT JOIN
+  `rakamin-kf-analytics-4724.kimia_farma.kf_product` AS kp
+  ON t.product_id = kp.product_id;
